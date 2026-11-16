@@ -91,7 +91,7 @@ export function BookStudioClient({
     setSingleError(null);
   }, []);
 
-  const handleTranslateSinglePage = useCallback(async (pageNumber: number) => {
+  const handleTranslateSinglePage = useCallback(async (pageNumber: number, model?: string) => {
     const safePage = validatePageNumber(pageNumber);
     setIsSingleTranslating(true);
     setSingleError(null);
@@ -100,12 +100,17 @@ export function BookStudioClient({
       const res = await fetch('/api/translate-page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page: safePage }),
+        body: JSON.stringify({
+          page: safePage,
+          model: model && model !== 'auto' ? model : undefined,
+          forceModel: Boolean(model && model !== 'auto'),
+        }),
       });
 
       const data = (await res.json()) as {
         error?: string;
-        pages?: { pageNumber: number; sectionTitle: string; translatedMarkdown: string }[];
+        pages?: { pageNumber: number; sectionTitle: string; translatedMarkdown: string; model?: string }[];
+        modelUsed?: string;
       };
 
       if (!res.ok || !data.pages || data.pages.length === 0) {
@@ -118,6 +123,7 @@ export function BookStudioClient({
         sectionTitle: item.sectionTitle,
         translatedMarkdown: item.translatedMarkdown,
         source: 'gemini',
+        model: item.model || data.modelUsed,
         updatedAt: new Date().toISOString(),
       };
 
@@ -144,6 +150,7 @@ export function BookStudioClient({
         sectionTitle: newTitle.trim() || `${section.code}. ${section.titleHy}`,
         translatedMarkdown: newMarkdown,
         source: 'edited',
+        model: 'edited',
         updatedAt: new Date().toISOString(),
       };
       await savePage(updated);
@@ -155,7 +162,7 @@ export function BookStudioClient({
     []
   );
 
-  const handleStartQueue = useCallback(async (queueInput: number[]) => {
+  const handleStartQueue = useCallback(async (queueInput: number[], modelOverride?: string) => {
     const uniqueQueue = Array.from(new Set(queueInput))
       .map((p) => validatePageNumber(p))
       .sort((a, b) => a - b);
@@ -190,12 +197,16 @@ export function BookStudioClient({
         const res = await fetch('/api/translate-page', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pages: slice }),
+          body: JSON.stringify({
+            pages: slice,
+            model: modelOverride && modelOverride !== 'auto' ? modelOverride : undefined,
+          }),
         });
 
         const data = (await res.json()) as {
           error?: string;
-          pages?: { pageNumber: number; sectionTitle: string; translatedMarkdown: string }[];
+          pages?: { pageNumber: number; sectionTitle: string; translatedMarkdown: string; model?: string }[];
+          modelUsed?: string;
         };
 
         if (!res.ok || !data.pages) {
@@ -208,6 +219,7 @@ export function BookStudioClient({
           sectionTitle: item.sectionTitle,
           translatedMarkdown: item.translatedMarkdown,
           source: 'gemini',
+          model: item.model || data.modelUsed,
           updatedAt: now,
         }));
 

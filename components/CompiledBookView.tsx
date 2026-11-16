@@ -16,6 +16,7 @@ import {
   TOTAL_BOOK_PAGES,
   buildCompiledBookMarkdown,
   calculateProgressStats,
+  getModelBadgeInfo,
   type TranslatedPage,
 } from '@/lib/book-structure';
 import {
@@ -297,14 +298,24 @@ export function CompiledBookView({
                       {page.sectionTitle}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onOpenPage(page.pageNumber)}
-                    className="no-print inline-flex items-center gap-1 text-xs text-slate-500 hover:text-sky-700"
-                  >
-                    <span>Բացել ընթերցիչում</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </button>
+                  <div className="no-print flex items-center gap-2">
+                    {page.model && (
+                      <span
+                        className={`text-[10px] font-mono-tabular px-2 py-0.5 rounded-full border ${getModelBadgeInfo(page.model).colorClass}`}
+                        title={`Մոդել՝ ${getModelBadgeInfo(page.model).label}`}
+                      >
+                        {getModelBadgeInfo(page.model).shortLabel}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onOpenPage(page.pageNumber)}
+                      className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-sky-700"
+                    >
+                      <span>Բացել ընթերցիչում</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
 
                 <MathRenderer content={page.translatedMarkdown} />

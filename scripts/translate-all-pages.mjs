@@ -31,7 +31,7 @@ function isPageValid(entry) {
   if (/\$[a-zA-Z]\s*\\neq\s*\\text(?:bf|rm)\{[RNZQ]\}/.test(md)) return false;
   if (/[=<>+\-*/\s]\s\{[a-zA-Z0-9][^}]{0,25}\}/.test(md.replace(/\{[,;.]\}/g, ''))) return false;
   const noCases = md.replace(/\\begin\{cases\}[\s\S]*?\\end\{cases\}/g, '');
-  if ((noCases.match(/\\text\{/g) || []).length > 15) return false;
+  if (/\\text\{[^{}]{80,}\}/.test(noCases)) return false;
   const noDisp = md.replace(/\$\$[\s\S]*?\$\$/g, '');
   const sd = (noDisp.match(/(?<!\\)\$/g) || []).length;
   if (sd % 2 !== 0) return false;
@@ -82,11 +82,6 @@ async function translateBatch(pageNumbers, thinking = 'minimal') {
       const data = await res.json();
       if (!res.ok || !Array.isArray(data.pages)) {
         const errMsg = data?.error || `HTTP ${res.status}`;
-        if (errMsg.includes('PerDay') || (errMsg.includes('retry in') && errMsg.includes('h'))) {
-          const fatal = new Error(`DAILY_QUOTA_EXHAUSTED: ${errMsg}`);
-          fatal.isDailyQuota = true;
-          throw fatal;
-        }
         throw new Error(errMsg);
       }
 
@@ -97,6 +92,7 @@ async function translateBatch(pageNumbers, thinking = 'minimal') {
           sectionTitle: item.sectionTitle,
           translatedMarkdown: item.translatedMarkdown,
           source: 'gemini',
+          model: item.model || data.modelUsed,
           updatedAt: new Date().toISOString(),
         };
         if (isPageValid(candidate)) {
@@ -115,12 +111,10 @@ async function translateBatch(pageNumbers, thinking = 'minimal') {
       return validPages;
     } catch (err) {
       lastErr = err;
-      if (err && err.isDailyQuota) {
-        throw err;
-      }
       const msg = err instanceof Error ? err.message : String(err);
-      const isRateLimit = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-      const delay = isRateLimit ? Math.min(35000, 10000 * attempt) : 2500 * attempt;
+      const isRateLimit = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota');
+      const delay = isRateLimit ? Math.min(25000, 8000 * attempt) : 2000 * attempt;
+      console.warn(`[retry ${attempt}/${maxAttempts}] Batch [${pageNumbers.join(',')}]: ${msg.slice(0, 120)} (wait ${delay}ms)`);
       await new Promise((r) => setTimeout(r, delay));
     }
   }
@@ -150,10 +144,9 @@ async function runPass(bookMap, targetPages, batchSize, concurrency, thinking = 
   );
 
   let nextIdx = 0;
-  let dailyQuotaHit = null;
 
   async function worker(workerId) {
-    while (!dailyQuotaHit) {
+    while (true) {
       const idx = nextIdx++;
       if (idx >= batches.length) break;
       const slice = batches[idx];
@@ -169,11 +162,6 @@ async function runPass(bookMap, targetPages, batchSize, concurrency, thinking = 
           `[w${workerId}] Batch [${slice[0]}..${slice[slice.length - 1]}] -> +${results.length}/${slice.length} ok (Total valid non-seed: ${265 - remaining}/265)`
         );
       } catch (err) {
-        if (err && err.isDailyQuota) {
-          dailyQuotaHit = err;
-          console.error(`[w${workerId}] DAILY QUOTA HIT:`, err.message.slice(0, 300));
-          break;
-        }
         console.error(
           `[w${workerId}] Batch [${slice.join(',')}] failed:`,
           err instanceof Error ? err.message.slice(0, 200) : err
@@ -184,28 +172,27 @@ async function runPass(bookMap, targetPages, batchSize, concurrency, thinking = 
 
   await Promise.all(Array.from({ length: concurrency }, (_, i) => worker(i + 1)));
   await saveBookState(bookMap);
-  if (dailyQuotaHit) throw dailyQuotaHit;
 }
 
 async function main() {
   const bookMap = await loadExisting();
 
-  // Pass 1: Fast multi-page batches
+  // Pass 1: Multi-page batches
   let missing = getMissingOrInvalidPages(bookMap);
   if (missing.length > 0) {
-    await runPass(bookMap, missing, 8, 5, 'minimal');
+    await runPass(bookMap, missing, 2, 2, 'low');
   }
 
-  // Pass 2: Smaller low-thinking precision pass for any flagged pages
+  // Pass 2: Precision pass for any stragglers
   missing = getMissingOrInvalidPages(bookMap);
   if (missing.length > 0) {
-    await runPass(bookMap, missing, 3, 4, 'low');
+    await runPass(bookMap, missing, 1, 2, 'low');
   }
 
-  // Pass 3: Single-page low-thinking precision for any stragglers
+  // Pass 3: Final single-page check
   missing = getMissingOrInvalidPages(bookMap);
   if (missing.length > 0) {
-    await runPass(bookMap, missing, 1, 3, 'low');
+    await runPass(bookMap, missing, 1, 1, 'low');
   }
 
   missing = getMissingOrInvalidPages(bookMap);

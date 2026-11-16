@@ -15,6 +15,7 @@ export interface TranslatedPage {
   sectionTitle: string;
   translatedMarkdown: string;
   source: 'seed' | 'gemini' | 'edited';
+  model?: string;
   updatedAt: string;
 }
 
@@ -23,6 +24,113 @@ export interface ProgressStats {
   translatedCount: number;
   remainingCount: number;
   percentage: number;
+}
+
+export interface ModelOption {
+  id: string;
+  labelHy: string;
+  shortLabel: string;
+  descriptionHy: string;
+  badgeColor: string;
+}
+
+export const TRANSLATION_MODELS: ModelOption[] = [
+  {
+    id: 'auto',
+    labelHy: 'Ավտոմատ կասկադ (Hydrogen → 3 Pro → Flash → Lite)',
+    shortLabel: 'Ավտոմատ',
+    descriptionHy: 'Փորձում է Gemini 4 Hydrogen, սպառվելիս՝ 3 Pro, ապա Flash, ապա Flash Lite',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  {
+    id: 'gemini-4-hydrogen',
+    labelHy: 'Gemini 4 Hydrogen',
+    shortLabel: 'G4 Hydrogen',
+    descriptionHy: 'Առաջատար առաջնային մոդել մաթեմատիկայի և բարդ դատողությունների համար',
+    badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  },
+  {
+    id: 'gemini-3.1-pro-preview',
+    labelHy: 'Gemini 3 Pro',
+    shortLabel: 'G3 Pro',
+    descriptionHy: 'Խորը տրամաբանություն և ճշգրիտ մաթեմատիկական ձևակերպումներ',
+    badgeColor: 'bg-violet-50 text-violet-700 border-violet-200',
+  },
+  {
+    id: 'gemini-2.5-flash',
+    labelHy: 'Gemini Flash',
+    shortLabel: 'Flash',
+    descriptionHy: 'Արագ և բարձրորակ մոդել մեծ ծավալի տեքստերի համար',
+    badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  {
+    id: 'gemini-3.1-flash-lite',
+    labelHy: 'Gemini Flash Lite',
+    shortLabel: 'Flash Lite',
+    descriptionHy: 'Թեթև և գերարագ անվճար մոդել բարձր քվոտայով',
+    badgeColor: 'bg-sky-50 text-sky-700 border-sky-200',
+  },
+];
+
+export function getModelBadgeInfo(model?: string): {
+  label: string;
+  shortLabel: string;
+  colorClass: string;
+} {
+  if (!model) {
+    return {
+      label: 'AI թարգմանություն',
+      shortLabel: 'AI',
+      colorClass: 'bg-slate-100 text-slate-700 border-slate-200',
+    };
+  }
+  if (model === 'seed') {
+    return {
+      label: 'Ստուգված ձեռագիր',
+      shortLabel: 'Ձեռագիր',
+      colorClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    };
+  }
+  if (model === 'edited') {
+    return {
+      label: 'Խմբագրված օգտատիրոջ կողմից',
+      shortLabel: 'Խմբագրված',
+      colorClass: 'bg-blue-50 text-blue-800 border-blue-200',
+    };
+  }
+  if (model.includes('hydrogen')) {
+    return {
+      label: 'Gemini 4 Hydrogen',
+      shortLabel: 'G4 Hydrogen',
+      colorClass: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+    };
+  }
+  if (model.includes('pro')) {
+    return {
+      label: 'Gemini 3 Pro',
+      shortLabel: 'G3 Pro',
+      colorClass: 'bg-violet-50 text-violet-800 border-violet-200',
+    };
+  }
+  if (model.includes('flash-lite')) {
+    return {
+      label: 'Gemini Flash Lite',
+      shortLabel: 'Flash Lite',
+      colorClass: 'bg-sky-50 text-sky-800 border-sky-200',
+    };
+  }
+  if (model.includes('flash')) {
+    return {
+      label: 'Gemini Flash',
+      shortLabel: 'G Flash',
+      colorClass: 'bg-amber-50 text-amber-800 border-amber-200',
+    };
+  }
+  return {
+    label: model,
+    shortLabel: model.slice(0, 10),
+    colorClass: 'bg-slate-100 text-slate-700 border-slate-200',
+  };
 }
 
 export const BOOK_SECTIONS: BookSection[] = [

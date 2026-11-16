@@ -9,6 +9,8 @@ import {
   getSectionProgress,
   getMissingPages,
   buildCompiledBookMarkdown,
+  getModelBadgeInfo,
+  TRANSLATION_MODELS,
   type TranslatedPage,
 } from './book-structure';
 
@@ -106,3 +108,41 @@ test('buildCompiledBookMarkdown preserves LaTeX formulas and page order', () => 
   assert.ok(idx1 !== -1 && idx4 !== -1 && idx1 < idx4);
   assert.ok(compiled.includes('$a^m \\cdot a^n = a^{m+n}$'));
 });
+
+test('getModelBadgeInfo maps all models accurately', () => {
+  const g4 = getModelBadgeInfo('gemini-4-hydrogen');
+  assert.equal(g4.shortLabel, 'G4 Hydrogen');
+  assert.ok(g4.colorClass.includes('indigo'));
+
+  const g3 = getModelBadgeInfo('gemini-3.1-pro-preview');
+  assert.equal(g3.shortLabel, 'G3 Pro');
+  assert.ok(g3.colorClass.includes('violet'));
+
+  const flash = getModelBadgeInfo('gemini-2.5-flash');
+  assert.equal(g4.label, 'Gemini 4 Hydrogen');
+  assert.equal(flash.shortLabel, 'G Flash');
+  assert.ok(flash.colorClass.includes('amber'));
+
+  const lite = getModelBadgeInfo('gemini-3.1-flash-lite');
+  assert.equal(lite.shortLabel, 'Flash Lite');
+  assert.ok(lite.colorClass.includes('sky'));
+
+  const seed = getModelBadgeInfo('seed');
+  assert.equal(seed.shortLabel, 'Ձեռագիր');
+
+  const edited = getModelBadgeInfo('edited');
+  assert.equal(edited.shortLabel, 'Խմբագրված');
+
+  const fallback = getModelBadgeInfo();
+  assert.equal(fallback.shortLabel, 'AI');
+});
+
+test('TRANSLATION_MODELS contains all 5 model choices in expected order', () => {
+  assert.equal(TRANSLATION_MODELS.length, 5);
+  assert.equal(TRANSLATION_MODELS[0].id, 'auto');
+  assert.equal(TRANSLATION_MODELS[1].id, 'gemini-4-hydrogen');
+  assert.equal(TRANSLATION_MODELS[2].id, 'gemini-3.1-pro-preview');
+  assert.equal(TRANSLATION_MODELS[3].id, 'gemini-2.5-flash');
+  assert.equal(TRANSLATION_MODELS[4].id, 'gemini-3.1-flash-lite');
+});
+

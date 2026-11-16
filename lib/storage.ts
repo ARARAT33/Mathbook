@@ -213,6 +213,7 @@ export function parseImportedBookJson(raw: string): TranslatedPage[] {
         sectionTitle: typeof val.sectionTitle === 'string' ? val.sectionTitle : '',
         translatedMarkdown: val.translatedMarkdown,
         source: val.source === 'gemini' || val.source === 'edited' ? val.source : 'seed',
+        model: typeof val.model === 'string' ? val.model : undefined,
         updatedAt: typeof val.updatedAt === 'string' ? val.updatedAt : new Date().toISOString(),
       });
     }

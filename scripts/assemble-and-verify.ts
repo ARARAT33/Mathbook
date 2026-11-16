@@ -140,6 +140,7 @@ async function main() {
       sectionTitle: entry.sectionTitle,
       translatedMarkdown: md,
       source: SEED_TRANSLATIONS[p] ? 'seed' : 'gemini',
+      model: SEED_TRANSLATIONS[p] ? 'seed' : (entry.model || 'gemini-3.1-flash-lite'),
       updatedAt: entry.updatedAt || new Date().toISOString(),
     };
   }

@@ -15,16 +15,22 @@ import {
   ExternalLink,
   AlertCircle,
   Download,
+  SearchCheck,
+  Cpu,
+  ChevronDown,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
   TOTAL_BOOK_PAGES,
   getSectionForPage,
   validatePageNumber,
+  TRANSLATION_MODELS,
+  getModelBadgeInfo,
   type TranslatedPage,
 } from '@/lib/book-structure';
 import { MathRenderer } from './MathRenderer';
 import { PdfPageViewer } from './PdfPageViewer';
+import { PageComparisonModal } from './PageComparisonModal';
 
 interface PageWorkspaceProps {
   currentPage: number;
@@ -32,8 +38,8 @@ interface PageWorkspaceProps {
   isTranslating: boolean;
   translationError: string | null;
   onSelectPage: (page: number) => void;
-  onTranslatePage: (page: number) => Promise<void>;
-  onTranslateSection: (startPage: number, endPage: number) => void;
+  onTranslatePage: (page: number, model?: string) => Promise<void>;
+  onTranslateSection: (startPage: number, endPage: number, model?: string) => void;
   onSaveEditedPage: (pageNumber: number, newMarkdown: string, newTitle: string) => Promise<void>;
   onOpenCompiled: () => void;
 }
@@ -55,6 +61,8 @@ export function PageWorkspace({
   const [draftTitle, setDraftTitle] = useState('');
   const [draftPageInput, setDraftPageInput] = useState<{ page: number; value: string } | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>('auto');
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
 
   const section = getSectionForPage(currentPage);
   const isEditing = editingPage === currentPage;
@@ -87,11 +95,15 @@ export function PageWorkspace({
   };
 
   const pdfUrl = `/api/pdf-page?page=${currentPage}`;
+  const modelBadge = getModelBadgeInfo(
+    pageData?.model || (pageData?.source === 'seed' ? 'seed' : pageData?.source === 'edited' ? 'edited' : undefined)
+  );
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
-      {/* Compact Page Toolbar */}
+      {/* Page Workspace Toolbar */}
       <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+        {/* Navigation & Section info */}
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
@@ -140,11 +152,30 @@ export function PageWorkspace({
           </div>
         </div>
 
+        {/* Action Controls & Model Selector */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Model Selector Dropdown */}
+          <div className="relative flex items-center">
+            <Cpu className="w-3.5 h-3.5 text-slate-400 absolute left-2 pointer-events-none" />
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              aria-label="Ընտրել AI թարգմանության մոդելը"
+              className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md pl-7 pr-7 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:outline-none focus:border-sky-500 cursor-pointer"
+            >
+              {TRANSLATION_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.shortLabel}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
+          </div>
+
           <button
             type="button"
             onClick={onOpenCompiled}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-md border border-slate-300 text-slate-800 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-md border border-slate-300 text-slate-800 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0 shadow-2xs"
           >
             <Download className="w-3.5 h-3.5 text-sky-600" />
             <span>PDF · Word · HTML</span>
@@ -153,26 +184,28 @@ export function PageWorkspace({
           <button
             type="button"
             onClick={() => setShowOriginalPdf((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0 shadow-2xs"
           >
             {showOriginalPdf ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
             <span>{showOriginalPdf ? 'Թաքցնել բնօրինակը' : 'Ցույց տալ բնօրինակ PDF-ը'}</span>
           </button>
 
+          {/* Line-by-line verification comparison tool button */}
           <button
             type="button"
-            onClick={() => onTranslateSection(section.startPage, section.endPage)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+            onClick={() => setIsComparisonModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-md border border-indigo-200 bg-indigo-50/60 text-indigo-700 hover:bg-indigo-100 transition-colors whitespace-nowrap shrink-0 shadow-2xs"
+            title="Տող առ տող մանրամասն համեմատել բնօրինակի հետ"
           >
-            <Sparkles className="w-3.5 h-3.5 text-sky-600" />
-            <span>Թարգմանել {section.code} բաժինը</span>
+            <SearchCheck className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Տող առ տող ստուգել</span>
           </button>
 
           {pageData && !isEditing && (
             <button
               type="button"
               onClick={handleOpenEdit}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0 shadow-2xs"
             >
               <Pencil className="w-3.5 h-3.5" />
               <span>Խմբագրել</span>
@@ -181,16 +214,16 @@ export function PageWorkspace({
 
           <button
             type="button"
-            onClick={() => onTranslatePage(currentPage)}
+            onClick={() => onTranslatePage(currentPage, selectedModel)}
             disabled={isTranslating}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60 transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60 transition-colors whitespace-nowrap shrink-0 shadow-2xs"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isTranslating ? 'animate-spin' : ''}`} />
             <span>
               {isTranslating
                 ? 'Թարգմանվում է...'
                 : pageData
-                  ? 'Վերաթարգմանել էջը'
+                  ? 'Վերաթարգմանել'
                   : 'Թարգմանել այս էջը'}
             </span>
           </button>
@@ -238,12 +271,11 @@ export function PageWorkspace({
               Հայերեն թարգմանություն · Էջ {currentPage}
             </div>
             {pageData && (
-              <span className="text-[11px] font-mono-tabular text-slate-500 shrink-0">
-                {pageData.source === 'seed'
-                  ? 'Ստուգված ձեռագիր'
-                  : pageData.source === 'edited'
-                    ? 'Խմբագրված'
-                    : 'AI ճշգրիտ թարգմանություն'}
+              <span
+                className={`text-[11px] font-mono-tabular px-2.5 py-0.5 rounded-full border shrink-0 font-medium ${modelBadge.colorClass}`}
+                title={`Մոդել՝ ${modelBadge.label}`}
+              >
+                {modelBadge.label}
               </span>
             )}
           </div>
@@ -331,8 +363,16 @@ export function PageWorkspace({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.16 }}
               >
-                <div className="text-xs font-medium text-sky-700 mb-3 pb-2 border-b border-slate-100">
-                  {pageData.sectionTitle}
+                <div className="flex items-center justify-between text-xs font-medium text-sky-700 mb-3 pb-2 border-b border-slate-100">
+                  <span>{pageData.sectionTitle}</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsComparisonModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold"
+                  >
+                    <SearchCheck className="w-3.5 h-3.5" />
+                    <span>Ստուգել բնօրինակի հետ</span>
+                  </button>
                 </div>
                 <MathRenderer content={pageData.translatedMarkdown} />
               </motion.article>
@@ -350,8 +390,8 @@ export function PageWorkspace({
                 <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
                   <button
                     type="button"
-                    onClick={() => onTranslatePage(currentPage)}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-sky-600 text-white hover:bg-sky-700 transition-colors"
+                    onClick={() => onTranslatePage(currentPage, selectedModel)}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-sky-600 text-white hover:bg-sky-700 transition-colors shadow-xs"
                   >
                     <Sparkles className="w-4 h-4" />
                     <span>Թարգմանել էջ {currentPage}-ը</span>
@@ -359,7 +399,7 @@ export function PageWorkspace({
                   <button
                     type="button"
                     onClick={handleOpenEdit}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-md border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-md border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs"
                   >
                     <Pencil className="w-4 h-4" />
                     <span>Մուտքագրել ձեռքով</span>
@@ -370,6 +410,20 @@ export function PageWorkspace({
           </div>
         </section>
       </div>
+
+      {/* Line-by-Line Detailed Comparison Modal */}
+      <PageComparisonModal
+        isOpen={isComparisonModalOpen}
+        onClose={() => setIsComparisonModalOpen(false)}
+        pageNumber={currentPage}
+        pageData={pageData}
+        onApplyImprovedMarkdown={async (p, md) => {
+          await onSaveEditedPage(p, md, pageData?.sectionTitle || `${section.code}. ${section.titleHy}`);
+        }}
+        onRetranslateWithModel={async (p, modelId) => {
+          await onTranslatePage(p, modelId);
+        }}
+      />
     </div>
   );
 }

@@ -33,12 +33,38 @@ interface TranslatedPagePayload {
   pageNumber: number;
   sectionTitle: string;
   translatedMarkdown: string;
+  model: string;
+}
+
+const WATERFALL_MODELS = [
+  'gemini-4-hydrogen',
+  'gemini-3.1-pro-preview',
+  'gemini-2.5-flash',
+  'gemini-3.1-flash-lite',
+] as const;
+
+function getThinkingConfigForModel(modelName: string, requestedMode: 'minimal' | 'low') {
+  if (
+    modelName === 'gemini-4-hydrogen' ||
+    modelName.includes('pro') ||
+    modelName.includes('argon') ||
+    modelName.includes('carbon')
+  ) {
+    // gemini-4-hydrogen and pro models do NOT support ThinkingLevel.MINIMAL (400 error)
+    return { thinkingLevel: ThinkingLevel.LOW };
+  }
+  if (modelName === 'gemini-3.1-flash-lite') {
+    return {
+      thinkingLevel: requestedMode === 'low' ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+    };
+  }
+  return { thinkingLevel: ThinkingLevel.LOW };
 }
 
 async function translatePagesInSingleCall(
   pageNumbers: number[],
-  modelName = 'gemini-3.1-flash-lite',
-  thinkingMode: 'minimal' | 'low' = 'minimal'
+  modelName: string,
+  thinkingMode: 'minimal' | 'low' = 'low'
 ): Promise<TranslatedPagePayload[]> {
   const ai = getGeminiClient();
 
@@ -72,7 +98,7 @@ async function translatePagesInSingleCall(
   });
 
   let lastError: unknown = null;
-  const maxAttempts = 3;
+  const maxAttempts = 2;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -81,9 +107,7 @@ async function translatePagesInSingleCall(
         contents: { parts },
         config: {
           systemInstruction: TRANSLATION_SYSTEM_INSTRUCTION,
-          thinkingConfig: {
-            thinkingLevel: thinkingMode === 'low' ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
-          },
+          thinkingConfig: getThinkingConfigForModel(modelName, thinkingMode),
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -156,6 +180,7 @@ async function translatePagesInSingleCall(
           pageNumber: safePage,
           sectionTitle: item.sectionTitle?.trim() || `${section.code}. ${section.titleHy}`,
           translatedMarkdown: md,
+          model: modelName,
         });
       }
 
@@ -175,7 +200,16 @@ async function translatePagesInSingleCall(
     } catch (err) {
       lastError = err;
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
+      if (
+        msg.includes('429') ||
+        msg.includes('RESOURCE_EXHAUSTED') ||
+        msg.includes('PerDay') ||
+        msg.includes('quota') ||
+        msg.includes('404') ||
+        msg.includes('NOT_FOUND') ||
+        msg.includes('no longer available') ||
+        msg.includes('not found')
+      ) {
         throw err;
       }
       if (attempt < maxAttempts) {
@@ -186,7 +220,71 @@ async function translatePagesInSingleCall(
 
   throw lastError instanceof Error
     ? lastError
-    : new Error(`Չհաջողվեց թարգմանել էջերը (${pageNumbers.join(', ')})`);
+    : new Error(`Չհաջողվեց թարգմանել էջերը [${pageNumbers.join(', ')}] ${modelName} մոդելով`);
+}
+
+async function translateWithModelFallback(
+  pageNumbers: number[],
+  preferredModel?: string,
+  forceModel = false,
+  thinkingMode: 'minimal' | 'low' = 'low'
+): Promise<{ pages: TranslatedPagePayload[]; usedModel: string }> {
+  let modelSequence: string[];
+
+  if (preferredModel && preferredModel !== 'auto') {
+    if (forceModel) {
+      modelSequence = [preferredModel];
+    } else {
+      modelSequence = [
+        preferredModel,
+        ...WATERFALL_MODELS.filter((m) => m !== preferredModel),
+      ];
+    }
+  } else {
+    // Default waterfall requested:
+    // 1. Gemini 4 Hydrogen
+    // 2. Gemini 3 Pro (gemini-3.1-pro-preview)
+    // 3. Gemini Flash (gemini-2.5-flash)
+    // 4. Gemini Flash Lite (gemini-3.1-flash-lite)
+    modelSequence = [...WATERFALL_MODELS];
+  }
+
+  let lastError: unknown = null;
+
+  for (const model of modelSequence) {
+    try {
+      const results = await translatePagesInSingleCall(pageNumbers, model, thinkingMode);
+      return { pages: results, usedModel: model };
+    } catch (err) {
+      lastError = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      const isQuotaOrLimit =
+        msg.includes('429') ||
+        msg.includes('RESOURCE_EXHAUSTED') ||
+        msg.includes('PerDay') ||
+        msg.includes('quota') ||
+        msg.includes('rate') ||
+        msg.includes('404') ||
+        msg.includes('NOT_FOUND') ||
+        msg.includes('PERMISSION_DENIED') ||
+        msg.includes('no longer available') ||
+        msg.includes('not found') ||
+        msg.includes('is not found');
+
+      console.warn(
+        `[Translate Waterfall] Մոդել ${model} ձախողվեց (quota/limit=${isQuotaOrLimit}): ${msg.slice(0, 160)}`
+      );
+
+      if (!isQuotaOrLimit && forceModel) {
+        throw err;
+      }
+      // If quota was hit or not found, proceed to next model in the waterfall
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Բոլոր մոդելները (${modelSequence.join(' → ')}) սպառված են կամ անհասանելի։`);
 }
 
 export async function POST(req: NextRequest) {
@@ -194,6 +292,8 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       page?: number;
       pages?: number[];
+      model?: string;
+      forceModel?: boolean;
       thinking?: 'minimal' | 'low';
     };
 
@@ -211,13 +311,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const thinkingMode = body.thinking === 'low' ? 'low' : 'minimal';
-    const results = await translatePagesInSingleCall(
+    const thinkingMode = body.thinking === 'minimal' ? 'minimal' : 'low';
+    const { pages, usedModel } = await translateWithModelFallback(
       targetPages,
-      'gemini-3.1-flash-lite',
+      body.model,
+      Boolean(body.forceModel),
       thinkingMode
     );
-    return NextResponse.json({ pages: results });
+
+    return NextResponse.json({ pages, modelUsed: usedModel });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Անհայտ սխալ թարգմանության ընթացքում';

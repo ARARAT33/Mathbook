@@ -3,6 +3,7 @@
   "appId": "1:535043786062:web:325eef9dbebff307708a1f",
   "apiKey": "AIzaSyAxKHBFt8s9ObepGwBphN33zzy992ypXB4",
   "authDomain": "cogent-muse-s71nt.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-exacttranslate-269a3af4-6f6a-4850-9701-dc067b5603f8",
   "storageBucket": "cogent-muse-s71nt.firebasestorage.app",
   "messagingSenderId": "535043786062",
   "measurementId": "",
