@@ -37,9 +37,9 @@ export interface ModelOption {
 export const TRANSLATION_MODELS: ModelOption[] = [
   {
     id: 'auto',
-    labelHy: 'Ավտոմատ կասկադ (Hydrogen → 3 Pro → Flash → Lite)',
+    labelHy: 'Ավտոմատ կասկադ (Hydrogen → 3.8 Flash → 3.1 Pro → 3.5 Lite)',
     shortLabel: 'Ավտոմատ',
-    descriptionHy: 'Փորձում է Gemini 4 Hydrogen, սպառվելիս՝ 3 Pro, ապա Flash, ապա Flash Lite',
+    descriptionHy: 'Փորձում է Gemini 4 Hydrogen, սպառվելիս՝ 3.8 Flash, ապա 3.1 Pro, ապա 3.5 Flash-Lite',
     badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
   {
@@ -50,23 +50,23 @@ export const TRANSLATION_MODELS: ModelOption[] = [
     badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   },
   {
-    id: 'gemini-3.1-pro-preview',
-    labelHy: 'Gemini 3 Pro',
-    shortLabel: 'G3 Pro',
-    descriptionHy: 'Խորը տրամաբանություն և ճշգրիտ մաթեմատիկական ձևակերպումներ',
-    badgeColor: 'bg-violet-50 text-violet-700 border-violet-200',
-  },
-  {
-    id: 'gemini-2.5-flash',
-    labelHy: 'Gemini Flash',
-    shortLabel: 'Flash',
+    id: 'gemini-3.8-flash',
+    labelHy: 'Gemini 3.8 Flash',
+    shortLabel: 'G3.8 Flash',
     descriptionHy: 'Արագ և բարձրորակ մոդել մեծ ծավալի տեքստերի համար',
     badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
   },
   {
-    id: 'gemini-3.1-flash-lite',
-    labelHy: 'Gemini Flash Lite',
-    shortLabel: 'Flash Lite',
+    id: 'gemini-3.1-pro-preview',
+    labelHy: 'Gemini 3.1 Pro',
+    shortLabel: 'G3.1 Pro',
+    descriptionHy: 'Խորը տրամաբանություն և ճշգրիտ մաթեմատիկական ձևակերպումներ',
+    badgeColor: 'bg-violet-50 text-violet-700 border-violet-200',
+  },
+  {
+    id: 'gemini-3.5-flash-lite',
+    labelHy: 'Gemini 3.5 Flash-Lite',
+    shortLabel: '3.5 Lite',
     descriptionHy: 'Թեթև և գերարագ անվճար մոդել բարձր քվոտայով',
     badgeColor: 'bg-sky-50 text-sky-700 border-sky-200',
   },
@@ -107,22 +107,22 @@ export function getModelBadgeInfo(model?: string): {
   }
   if (model.includes('pro')) {
     return {
-      label: 'Gemini 3 Pro',
-      shortLabel: 'G3 Pro',
+      label: 'Gemini 3.1 Pro',
+      shortLabel: 'G3.1 Pro',
       colorClass: 'bg-violet-50 text-violet-800 border-violet-200',
     };
   }
   if (model.includes('flash-lite')) {
     return {
-      label: 'Gemini Flash Lite',
-      shortLabel: 'Flash Lite',
+      label: 'Gemini 3.5 Flash-Lite',
+      shortLabel: '3.5 Lite',
       colorClass: 'bg-sky-50 text-sky-800 border-sky-200',
     };
   }
   if (model.includes('flash')) {
     return {
-      label: 'Gemini Flash',
-      shortLabel: 'G Flash',
+      label: 'Gemini 3.8 Flash',
+      shortLabel: 'G3.8 Flash',
       colorClass: 'bg-amber-50 text-amber-800 border-amber-200',
     };
   }

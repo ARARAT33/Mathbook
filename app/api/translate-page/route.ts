@@ -38,22 +38,19 @@ interface TranslatedPagePayload {
 
 const WATERFALL_MODELS = [
   'gemini-4-hydrogen',
+  'gemini-3.8-flash',
   'gemini-3.1-pro-preview',
-  'gemini-2.5-flash',
-  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
 ] as const;
 
 function getThinkingConfigForModel(modelName: string, requestedMode: 'minimal' | 'low') {
   if (
     modelName === 'gemini-4-hydrogen' ||
-    modelName.includes('pro') ||
-    modelName.includes('argon') ||
-    modelName.includes('carbon')
+    modelName.includes('pro')
   ) {
-    // gemini-4-hydrogen and pro models do NOT support ThinkingLevel.MINIMAL (400 error)
     return { thinkingLevel: ThinkingLevel.LOW };
   }
-  if (modelName === 'gemini-3.1-flash-lite') {
+  if (modelName === 'gemini-3.5-flash-lite' || modelName === 'gemini-3.8-flash') {
     return {
       thinkingLevel: requestedMode === 'low' ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
     };

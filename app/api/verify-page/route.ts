@@ -7,9 +7,9 @@ export const runtime = 'nodejs';
 
 const WATERFALL_MODELS = [
   'gemini-4-hydrogen',
+  'gemini-3.8-flash',
   'gemini-3.1-pro-preview',
-  'gemini-2.5-flash',
-  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
 ] as const;
 
 const VERIFICATION_SYSTEM_INSTRUCTION = `Դուք ակադեմիական մաթեմատիկայի գլխավոր խմբագիր և ստուգիչ-տեսուչ եք։

@@ -115,16 +115,15 @@ test('getModelBadgeInfo maps all models accurately', () => {
   assert.ok(g4.colorClass.includes('indigo'));
 
   const g3 = getModelBadgeInfo('gemini-3.1-pro-preview');
-  assert.equal(g3.shortLabel, 'G3 Pro');
+  assert.equal(g3.shortLabel, 'G3.1 Pro');
   assert.ok(g3.colorClass.includes('violet'));
 
-  const flash = getModelBadgeInfo('gemini-2.5-flash');
-  assert.equal(g4.label, 'Gemini 4 Hydrogen');
-  assert.equal(flash.shortLabel, 'G Flash');
+  const flash = getModelBadgeInfo('gemini-3.8-flash');
+  assert.equal(flash.shortLabel, 'G3.8 Flash');
   assert.ok(flash.colorClass.includes('amber'));
 
-  const lite = getModelBadgeInfo('gemini-3.1-flash-lite');
-  assert.equal(lite.shortLabel, 'Flash Lite');
+  const lite = getModelBadgeInfo('gemini-3.5-flash-lite');
+  assert.equal(lite.shortLabel, '3.5 Lite');
   assert.ok(lite.colorClass.includes('sky'));
 
   const seed = getModelBadgeInfo('seed');
@@ -141,8 +140,8 @@ test('TRANSLATION_MODELS contains all 5 model choices in expected order', () => 
   assert.equal(TRANSLATION_MODELS.length, 5);
   assert.equal(TRANSLATION_MODELS[0].id, 'auto');
   assert.equal(TRANSLATION_MODELS[1].id, 'gemini-4-hydrogen');
-  assert.equal(TRANSLATION_MODELS[2].id, 'gemini-3.1-pro-preview');
-  assert.equal(TRANSLATION_MODELS[3].id, 'gemini-2.5-flash');
-  assert.equal(TRANSLATION_MODELS[4].id, 'gemini-3.1-flash-lite');
+  assert.equal(TRANSLATION_MODELS[2].id, 'gemini-3.8-flash');
+  assert.equal(TRANSLATION_MODELS[3].id, 'gemini-3.1-pro-preview');
+  assert.equal(TRANSLATION_MODELS[4].id, 'gemini-3.5-flash-lite');
 });
 

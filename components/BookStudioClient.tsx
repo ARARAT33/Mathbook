@@ -256,6 +256,80 @@ export function BookStudioClient({
     }));
   }, []);
 
+  const handleVerifyFullBook = useCallback(async (modelOverride?: string) => {
+    batchStopRef.current = false;
+    setActiveTab('batch');
+    setBatchState({
+      isRunning: true,
+      currentBatchPages: [],
+      completedInRun: 0,
+      targetTotalInRun: TOTAL_BOOK_PAGES,
+      failedPages: [],
+      lastError: null,
+    });
+
+    let completed = 0;
+    const allPages: number[] = [];
+    for (let p = 1; p <= TOTAL_BOOK_PAGES; p++) {
+      allPages.push(p);
+    }
+
+    const batchSize = 4;
+    for (let i = 0; i < allPages.length; i += batchSize) {
+      if (batchStopRef.current) break;
+      const slice = allPages.slice(i, i + batchSize);
+      setBatchState((prev) => ({ ...prev, currentBatchPages: slice }));
+
+      try {
+        const res = await fetch('/api/verify-book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pages: slice, model: modelOverride }),
+        });
+        const data = (await res.json()) as {
+          error?: string;
+          verifiedPages?: { pageNumber: number; improvedMarkdown: string; accuracyScore: number; modelUsed: string }[];
+        };
+
+        if (!res.ok || !data.verifiedPages) {
+          throw new Error(data.error || 'Ստուգման սխալ');
+        }
+
+        const now = new Date().toISOString();
+        const savedBatch: TranslatedPage[] = data.verifiedPages.map((item) => {
+          const old = pagesMap[item.pageNumber];
+          const section = getSectionForPage(item.pageNumber);
+          return {
+            pageNumber: item.pageNumber,
+            sectionTitle: old?.sectionTitle || `${section.code}. ${section.titleHy}`,
+            translatedMarkdown: item.improvedMarkdown,
+            source: 'gemini',
+            model: item.modelUsed,
+            updatedAt: now,
+          };
+        });
+
+        await savePagesBatch(savedBatch);
+        completed += savedBatch.length;
+
+        setPagesMap((prev) => {
+          const next = { ...prev };
+          for (const p of savedBatch) {
+            next[p.pageNumber] = p;
+          }
+          return next;
+        });
+
+        setBatchState((prev) => ({ ...prev, completedInRun: completed }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Ստուգման սխալ';
+        setBatchState((prev) => ({ ...prev, lastError: msg }));
+      }
+    }
+
+    setBatchState((prev) => ({ ...prev, isRunning: false, currentBatchPages: [] }));
+  }, [pagesMap]);
+
   const handleStopQueue = useCallback(() => {
     batchStopRef.current = true;
     setBatchState((prev) => ({
@@ -483,6 +557,7 @@ export function BookStudioClient({
               pagesMap={pagesMap}
               batchState={batchState}
               onStartQueue={handleStartQueue}
+              onVerifyFullBook={handleVerifyFullBook}
               onStopQueue={handleStopQueue}
               onOpenPage={handleSelectPage}
               onExportJsonBackup={handleExportJsonBackup}
